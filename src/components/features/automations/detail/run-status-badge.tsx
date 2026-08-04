@@ -23,20 +23,20 @@ const statusConfig: Record<
     label: I18nKey.AUTOMATIONS$DETAIL$FAILED,
     style: "border-[var(--oh-danger)]/50 bg-[var(--oh-danger)]/10 text-danger",
   },
-  [AutomationRunStatus.PENDING]: {
-    label: I18nKey.AUTOMATIONS$DETAIL$PENDING,
-    style: "border-[var(--oh-border)] bg-surface-raised text-muted",
-  },
-  [AutomationRunStatus.RUNNING]: {
-    label: I18nKey.AUTOMATIONS$DETAIL$RUNNING,
-    style: "border-[var(--oh-border)] bg-surface-raised text-muted",
-  },
   [AutomationRunStatus.CANCELLED]: {
     label: I18nKey.AUTOMATIONS$DETAIL$CANCELLED,
     style: "border-[var(--oh-border)] bg-surface-raised text-muted",
   },
   [AutomationRunStatus.SKIPPED]: {
     label: I18nKey.AUTOMATIONS$DETAIL$SKIPPED,
+    style: "border-[var(--oh-border)] bg-surface-raised text-muted",
+  },
+  [AutomationRunStatus.PENDING]: {
+    label: I18nKey.AUTOMATIONS$DETAIL$PENDING,
+    style: "border-[var(--oh-border)] bg-surface-raised text-muted",
+  },
+  [AutomationRunStatus.RUNNING]: {
+    label: I18nKey.AUTOMATIONS$DETAIL$RUNNING,
     style: "border-[var(--oh-border)] bg-surface-raised text-muted",
   },
 };

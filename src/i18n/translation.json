@@ -14126,6 +14126,23 @@
     "uk": "Не вдалося",
     "ca": "Ha fallat"
   },
+  "AUTOMATIONS$DETAIL$CANCELLED": {
+    "en": "Cancelled",
+    "ja": "キャンセル済み",
+    "zh-CN": "已取消",
+    "zh-TW": "已取消",
+    "ko-KR": "취소됨",
+    "no": "Kansellert",
+    "it": "Annullato",
+    "pt": "Cancelado",
+    "es": "Cancelado",
+    "ar": "تم الإلغاء",
+    "fr": "Annulé",
+    "tr": "İptal edildi",
+    "de": "Abgebrochen",
+    "uk": "Скасовано",
+    "ca": "Cancel·lat"
+  },
   "AUTOMATIONS$DETAIL$PENDING": {
     "en": "Pending",
     "ja": "保留中",
@@ -14159,23 +14176,6 @@
     "de": "Wird ausgeführt",
     "uk": "Виконується",
     "ca": "En execució"
-  },
-  "AUTOMATIONS$DETAIL$CANCELLED": {
-    "en": "Cancelled",
-    "ja": "キャンセル済み",
-    "zh-CN": "已取消",
-    "zh-TW": "已取消",
-    "ko-KR": "취소됨",
-    "no": "Avbrutt",
-    "it": "Annullato",
-    "pt": "Cancelado",
-    "es": "Cancelado",
-    "ar": "أُلغي",
-    "fr": "Annulé",
-    "tr": "İptal edildi",
-    "de": "Abgebrochen",
-    "uk": "Скасовано",
-    "ca": "Cancel·lat"
   },
   "AUTOMATIONS$DETAIL$SKIPPED": {
     "en": "Skipped",
