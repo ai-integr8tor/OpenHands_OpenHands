@@ -89,6 +89,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     runtimeServicesInfo: null,
     lockToCloud: null,
     basePath: "/",
+    disableSecure: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -132,6 +133,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
         break;
       case "--base-path":
         config.basePath = normalizeBasePath(argv[++i]);
+        break;
+      case "--disable-secure":
+        config.disableSecure = true;
         break;
 
       case "--auth-required":
@@ -211,6 +215,11 @@ OPTIONS:
   --base-path <path>           Mount the SPA under <path> (default: /).
                                For example, --base-path /canvas serves
                                index.html and assets under /canvas.
+  --disable-secure            Strip the Secure attribute from Set-Cookie
+                              headers forwarded from backends. Use when
+                              serving over plain http:// to a non-loopback
+                              host (e.g. a LAN/VM IP) so browsers will send
+                              session cookies back.
   --reject-prefix <prefix>     Return 503 for requests matching <prefix>
                                instead of SPA-fallbacking to index.html;
                                may be repeated. Useful in --frontend-only
@@ -542,7 +551,10 @@ async function handleStatic(
 
 export function startStaticServer(config) {
   const route = createRouter(config.routes);
-  const proxy = createProxyHandlers({ label: `static:${config.port}` });
+  const proxy = createProxyHandlers({
+    label: `static:${config.port}`,
+    stripSecureCookie: config.disableSecure === true,
+  });
   const dirAbs = resolve(config.dir);
   const injectionOpts = {
     sessionApiKey: config.sessionApiKey || null,
