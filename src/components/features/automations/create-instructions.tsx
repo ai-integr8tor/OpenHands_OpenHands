@@ -1,44 +1,15 @@
-import { useState, type ReactNode } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
 import ChevronDownIcon from "#/icons/chevron-down.svg?react";
 import MessageSquareShareIcon from "#/icons/message-square-share.svg?react";
 import { cn } from "#/utils/utils";
 import { BrandButton } from "#/components/features/settings/brand-button";
-import { useLaunchSkillInChat } from "#/hooks/use-launch-skill-in-chat";
-import { useActiveBackend } from "#/contexts/active-backend-context";
-import { useTracking } from "#/hooks/use-tracking";
 import { getAutomationsDocsUrl } from "#/manifests/automation-interface";
+import { AutomationConversationLaunchModal } from "./automation-conversation-launch-modal";
+import type { AutomationConversationLaunchRequest } from "./use-launch-automation-conversation";
 
 const DOCS_URL = getAutomationsDocsUrl();
-
-function InlineExampleWrap({ children }: { children?: ReactNode }) {
-  return <span className="whitespace-nowrap">{children}</span>;
-}
-
-function InlineCodeChip({ children }: { children?: ReactNode }) {
-  return (
-    <code
-      data-testid="automations-create-instructions-example"
-      className={cn(
-        "mx-0.5 inline-block rounded-sm border border-[var(--oh-border-subtle)]",
-        "bg-[var(--oh-surface-raised)] px-1.5 py-0.5 align-baseline font-mono text-[11px] text-white",
-      )}
-    >
-      {children}
-    </code>
-  );
-}
-
-function InlinePunctuation({ children }: { children?: ReactNode }) {
-  return <>{children}</>;
-}
-
-const CREATE_INSTRUCTIONS_INLINE_COMPONENTS = {
-  example: <InlineExampleWrap />,
-  cmd: <InlineCodeChip />,
-  punct: <InlinePunctuation />,
-};
 
 interface CreateInstructionsProps {
   /** If true, the instructions are collapsible and start collapsed */
@@ -49,31 +20,100 @@ interface CreateInstructionsContentProps {
   onLaunch?: () => void;
 }
 
+interface AutomationStartOptionProps {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  testId: string;
+  buttonTestId: string;
+  onClick: () => void;
+}
+
+function AutomationStartOption({
+  title,
+  description,
+  buttonLabel,
+  testId,
+  buttonTestId,
+  onClick,
+}: AutomationStartOptionProps) {
+  return (
+    <section
+      data-testid={testId}
+      className="flex h-full min-w-0 flex-col justify-between gap-4 rounded-lg border border-[var(--oh-border)] bg-[var(--oh-surface)] p-4"
+    >
+      <div className="min-w-0">
+        <h4 className="text-sm font-medium text-content">{title}</h4>
+        <p className="mt-1 text-xs leading-relaxed text-tertiary-light">
+          {description}
+        </p>
+      </div>
+      <BrandButton
+        type="button"
+        variant="primary"
+        testId={buttonTestId}
+        className="mt-auto h-auto min-h-10 w-full px-4 py-2 text-center leading-tight"
+        onClick={onClick}
+        startContent={
+          <MessageSquareShareIcon className="size-4 shrink-0" aria-hidden />
+        }
+      >
+        {buttonLabel}
+      </BrandButton>
+    </section>
+  );
+}
+
 export function CreateInstructionsContent({
   onLaunch,
 }: CreateInstructionsContentProps = {}) {
   const { t } = useTranslation("openhands");
-  const launchInChat = useLaunchSkillInChat();
-  const active = useActiveBackend();
-  const { trackAutomationCreatedButton } = useTracking();
+  const [launchRequest, setLaunchRequest] =
+    useState<AutomationConversationLaunchRequest | null>(null);
 
-  const handleCreateAutomation = () => {
-    trackAutomationCreatedButton({ backendKind: active.backend.kind });
-    launchInChat(t(I18nKey.AUTOMATIONS$CREATE_AUTOMATION_PROMPT), onLaunch);
+  const handleFindOpportunities = () => {
+    setLaunchRequest({
+      intent: "find_opportunities",
+      source: "empty_state",
+      prompt: t(I18nKey.AUTOMATIONS$CREATE_AUTOMATION_PROMPT),
+    });
+  };
+
+  const handleAddAutomation = () => {
+    setLaunchRequest({
+      intent: "add_automation",
+      source: "empty_state",
+      prompt: t(I18nKey.AUTOMATIONS$ADD_AUTOMATION_PROMPT),
+    });
+  };
+
+  const handleLaunchModalClose = () => {
+    setLaunchRequest(null);
+    onLaunch?.();
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <p className="text-sm leading-relaxed text-tertiary-light">
-        <Trans
-          ns="openhands"
-          i18nKey={I18nKey.AUTOMATIONS$EMPTY_OPTION_CONVERSATION_DESC}
-          components={CREATE_INSTRUCTIONS_INLINE_COMPONENTS}
-        />{" "}
-        {t(I18nKey.AUTOMATIONS$CREATE_INSTRUCTIONS_GUIDANCE)}
-      </p>
+    <>
+      <div className="flex flex-col gap-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AutomationStartOption
+            title={t(I18nKey.AUTOMATIONS$DISCOVERY_OPTION_TITLE)}
+            description={t(I18nKey.AUTOMATIONS$CREATE_INSTRUCTIONS_GUIDANCE)}
+            buttonLabel={t(I18nKey.AUTOMATIONS$CREATE_AUTOMATION_BUTTON)}
+            testId="automations-discovery-option"
+            buttonTestId="automations-find-opportunities"
+            onClick={handleFindOpportunities}
+          />
+          <AutomationStartOption
+            title={t(I18nKey.AUTOMATIONS$CUSTOM_OPTION_TITLE)}
+            description={t(I18nKey.AUTOMATIONS$CUSTOM_OPTION_DESC)}
+            buttonLabel={t(I18nKey.AUTOMATIONS$ADD_AUTOMATION)}
+            testId="automations-add-option"
+            buttonTestId="automations-add-known-automation"
+            onClick={handleAddAutomation}
+          />
+        </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <a
           href={DOCS_URL}
           target="_blank"
@@ -82,19 +122,12 @@ export function CreateInstructionsContent({
         >
           {t(I18nKey.AUTOMATIONS$EMPTY_LEARN_MORE)}
         </a>
-        <BrandButton
-          type="button"
-          variant="primary"
-          testId="automations-create-automation"
-          onClick={handleCreateAutomation}
-          startContent={
-            <MessageSquareShareIcon className="size-4" aria-hidden />
-          }
-        >
-          {t(I18nKey.AUTOMATIONS$CREATE_AUTOMATION_BUTTON)}
-        </BrandButton>
       </div>
-    </div>
+      <AutomationConversationLaunchModal
+        request={launchRequest}
+        onClose={handleLaunchModalClose}
+      />
+    </>
   );
 }
 
