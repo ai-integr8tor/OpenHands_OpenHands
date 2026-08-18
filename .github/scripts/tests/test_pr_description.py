@@ -222,3 +222,37 @@ https://youtube.com/watch?v=abc123
 """
     errors = validate_bug_fix_evidence(body)
     assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# Fenced-block regression coverage for #16553.
+#
+# ``## <heading>`` inside a fence must not become a section, so a quoted
+# template or pasted log cannot satisfy the required-sections gate.
+# ---------------------------------------------------------------------------
+
+
+def test_extract_sections_ignores_fenced_h2_heading():
+    # Quoted PR template inside a fence: ``## How to Test`` is inside the
+    # fence, not a real section. The real ``## Summary`` lives outside.
+    body = (
+        "## Why\n"
+        "Because.\n\n"
+        "## Summary\n"
+        "What it does.\n\n"
+        "## Issue Number\n"
+        "Fixes #1\n\n"
+        "Quoting the template for context:\n\n"
+        "```\n"
+        "## How to Test\n"
+        "1. Run it.\n"
+        "```\n"
+    )
+    from check_pr_description import extract_sections
+
+    sections = extract_sections(body)
+    # The required template fields are present.
+    for required in ("Why", "Summary", "Issue Number"):
+        assert required in sections, f"missing {required}"
+    # The fenced "## How to Test" must not appear as a real section.
+    assert "How to Test" not in sections
