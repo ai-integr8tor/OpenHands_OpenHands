@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from check_pr_description import (
     extract_linked_issue_numbers,
     extract_pr_type,
+    extract_sections,
     validate_linked_issue_ready,
     validate_bug_fix_evidence,
     BUG_LABEL,
@@ -222,3 +223,41 @@ https://youtube.com/watch?v=abc123
 """
     errors = validate_bug_fix_evidence(body)
     assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# extract_sections — fenced code block awareness
+# ---------------------------------------------------------------------------
+
+def test_extract_sections_ignores_headings_in_code_blocks():
+    body = (
+        "## Why\n"
+        "We need this fix.\n\n"
+        "## Summary\n"
+        "```\n"
+        "## This looks like a heading but is in a code block\n"
+        "some code\n"
+        "```\n\n"
+        "## How to Test\n"
+        "Run the tests.\n"
+    )
+    sections = extract_sections(body)
+    assert "Why" in sections
+    assert "Summary" in sections
+    assert "How to Test" in sections
+    assert "This looks like a heading but is in a code block" not in sections
+
+def test_extract_sections_ignores_headings_in_tilde_fences():
+    body = (
+        "## Why\n"
+        "~~~python\n"
+        "## Not a real heading\n"
+        "x = 1\n"
+        "~~~\n\n"
+        "## Summary\n"
+        "Summary text.\n"
+    )
+    sections = extract_sections(body)
+    assert "Why" in sections
+    assert "Summary" in sections
+    assert "Not a real heading" not in sections

@@ -227,3 +227,35 @@ def test_extract_sections():
     assert "title two" in sections
     assert "Text 1" in sections["title one"]
     assert "Text 2" in sections["title two"]
+
+def test_extract_sections_ignores_headings_in_code_blocks():
+    body = (
+        "### Actual Behavior\n"
+        "I ran `npm run dev` and saw:\n\n"
+        "```\n"
+        "### This is a code comment heading\n"
+        "some code here\n"
+        "```\n\n"
+        "### Acceptance Criteria\n"
+        "- [ ] Fixed\n"
+    )
+    sections = extract_sections(body)
+    assert "actual behavior" in sections
+    assert "acceptance criteria" in sections
+    assert "this is a code comment heading" not in sections
+    assert "### This is a code comment heading" in sections["actual behavior"]
+
+def test_extract_sections_ignores_headings_in_tilde_fences():
+    body = (
+        "### Desired Behavior\n"
+        "~~~python\n"
+        "### Not a real heading\n"
+        "x = 1\n"
+        "~~~\n\n"
+        "### Acceptance Criteria\n"
+        "- [ ] Done\n"
+    )
+    sections = extract_sections(body)
+    assert "desired behavior" in sections
+    assert "acceptance criteria" in sections
+    assert "not a real heading" not in sections
