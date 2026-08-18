@@ -100,14 +100,43 @@ def visible_text(text: str) -> str:
     return cleaned
 
 
+def _fenced_code_block_ranges(body: str) -> list[tuple[int, int]]:
+    """Return (start, end) character offsets of fenced code blocks in body."""
+    ranges: list[tuple[int, int]] = []
+    in_fence = False
+    fence_start = 0
+    pos = 0
+    for line in body.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            if not in_fence:
+                in_fence = True
+                fence_start = pos
+            else:
+                in_fence = False
+                ranges.append((fence_start, pos + len(line)))
+        pos += len(line)
+    if in_fence:
+        ranges.append((fence_start, len(body)))
+    return ranges
+
+
 def extract_sections(body: str) -> dict[str, str]:
     """Split the body into a {heading: text} map using `### <heading>` boundaries.
 
     Issue forms render every field this way. Free-form issues (not created via a
     form) may still use `###` headings; if they don't, the map is empty and the
     caller falls back to whole-body checks.
+
+    Headings inside fenced code blocks (``` or ~~~) are ignored so that code
+    examples containing heading-like lines do not create false section boundaries.
     """
-    matches = list(HEADING_RE.finditer(body))
+    fence_ranges = _fenced_code_block_ranges(body)
+    matches = [
+        m
+        for m in HEADING_RE.finditer(body)
+        if not any(start <= m.start() < end for start, end in fence_ranges)
+    ]
     sections: dict[str, str] = {}
     for index, match in enumerate(matches):
         start = match.end()
