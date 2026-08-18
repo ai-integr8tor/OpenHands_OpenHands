@@ -24,6 +24,7 @@ import {
 } from "#/utils/mcp-marketplace-utils";
 import { getFeaturedAutomationIds } from "#/manifests/automation-interface";
 import {
+  getAutomationsForIntegration,
   getAutomationLaunchPrompt,
   getIntegrationIds,
 } from "#/utils/automation-catalog";
@@ -43,6 +44,8 @@ interface RecommendedAutomationsSectionProps {
   onSelect: (automation: RecommendedAutomation) => void;
   /** When true, title, description, and cards share one scroll area. */
   scrollableGrid?: boolean;
+  /** Restrict the catalog to automations that declare this integration. */
+  integrationId?: string;
 }
 
 export function getAutomationsByPopularity(
@@ -132,11 +135,13 @@ function buildRecommendedAutomationPills(
   installedServers: MCPServerConfig[],
   missingCount: number,
   translate: TFunction,
+  connectedIntegrationId?: string,
 ): SkillCardPill[] {
   const pills: SkillCardPill[] = integrations.map(
     ({ id, entry, mcpInstallable }) => {
       const installed =
-        !!entry && findInstalledEntryMatch(entry, installedServers);
+        id === connectedIntegrationId ||
+        (!!entry && findInstalledEntryMatch(entry, installedServers));
       const name = entry?.name ?? id;
 
       return {
@@ -191,6 +196,7 @@ interface AutomationCardGridProps {
   installedServers: MCPServerConfig[];
   onSelect: (automation: RecommendedAutomation) => void;
   translate: TFunction;
+  connectedIntegrationId?: string;
 }
 
 function AutomationCardGrid({
@@ -198,6 +204,7 @@ function AutomationCardGrid({
   installedServers,
   onSelect,
   translate,
+  connectedIntegrationId,
 }: AutomationCardGridProps) {
   return (
     <div className={cn("mt-3", extensionModuleCardGridClassName)}>
@@ -207,7 +214,8 @@ function AutomationCardGrid({
         // actually connect; an external-setup integration is surfaced on its
         // own pill instead.
         const missingCount = integrations.filter(
-          ({ entry, mcpInstallable }) =>
+          ({ id, entry, mcpInstallable }) =>
+            id !== connectedIntegrationId &&
             !!entry &&
             mcpInstallable &&
             !findInstalledEntryMatch(entry, installedServers),
@@ -255,6 +263,7 @@ function AutomationCardGrid({
                     installedServers,
                     missingCount,
                     translate,
+                    connectedIntegrationId,
                   )}
                   testId={`recommended-automation-pills-${automation.id}`}
                 />
@@ -273,10 +282,14 @@ export function RecommendedAutomationsSection({
   query = "",
   onSelect,
   scrollableGrid = false,
+  integrationId,
 }: RecommendedAutomationsSectionProps) {
   const { t } = useTranslation("openhands");
 
-  const visibleAutomations = RECOMMENDED_AUTOMATIONS.filter((automation) => {
+  const candidateAutomations = integrationId
+    ? getAutomationsForIntegration(RECOMMENDED_AUTOMATIONS, integrationId)
+    : RECOMMENDED_AUTOMATIONS;
+  const visibleAutomations = candidateAutomations.filter((automation) => {
     const integrationEntries = getIntegrationEntries(automation);
     return (
       isAutomationAvailable(automation) &&
@@ -324,6 +337,7 @@ export function RecommendedAutomationsSection({
               installedServers={installedServers}
               onSelect={onSelect}
               translate={t}
+              connectedIntegrationId={integrationId}
             />
           </>
         )}
@@ -348,6 +362,7 @@ export function RecommendedAutomationsSection({
               installedServers={installedServers}
               onSelect={onSelect}
               translate={t}
+              connectedIntegrationId={integrationId}
             />
           </section>
         )}
