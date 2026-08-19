@@ -15,9 +15,14 @@ export type ConversationTab =
 
 export type ConversationMode = "code" | "plan";
 
-export interface IMessageToSend {
+interface ITimedMessage {
   text: string;
   timestamp: number;
+}
+
+export interface IMessageToSend extends ITimedMessage {
+  /** Composer that may consume this one-shot value; null denotes home. */
+  targetConversationId: string | null;
 }
 
 interface ConversationState {
@@ -62,9 +67,9 @@ interface ConversationActions {
   addImageLoading: (imageName: string) => void;
   removeImageLoading: (imageName: string) => void;
   clearAllLoading: () => void;
-  setMessageToSend: (text: string) => void;
+  setMessageToSend: (text: string, targetConversationId: string | null) => void;
   clearMessageToSend: () => void;
-  restoreMessageToInputIfEmpty: (text: string) => void;
+  restoreMessageToInputIfEmpty: (text: string, conversationId: string) => void;
   clearMessageRestoreIfEmpty: () => void;
   setSubmittedMessage: (message: string | null) => void;
   resetConversationState: () => void;
@@ -283,12 +288,13 @@ export const useConversationStore = create<ConversationStore>()(
       clearAllLoading: () =>
         set({ loadingFiles: [], loadingImages: [] }, false, "clearAllLoading"),
 
-      setMessageToSend: (text) =>
+      setMessageToSend: (text, targetConversationId) =>
         set(
           {
             messageToSend: {
               text,
               timestamp: Date.now(),
+              targetConversationId,
             },
           },
           false,
@@ -300,12 +306,13 @@ export const useConversationStore = create<ConversationStore>()(
       clearMessageToSend: () =>
         set({ messageToSend: null }, false, "clearMessageToSend"),
 
-      restoreMessageToInputIfEmpty: (text) =>
+      restoreMessageToInputIfEmpty: (text, conversationId) =>
         set(
           {
             messageRestoreIfEmpty: {
               text,
               timestamp: Date.now(),
+              targetConversationId: conversationId,
             },
           },
           false,
