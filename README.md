@@ -99,6 +99,40 @@ docker run -it --rm \
   ghcr.io/openhands/agent-canvas:1.14.0 # x-release-please-version
 ```
 
+> [!NOTE]
+> **Linux (Docker Engine) only:** the container runs as uid 10001 (openhands) —
+> bind-mounted host dirs must be writable by that uid, or the agent-server and
+> automation crash at startup. Run this **before** `docker run`:
+>
+> ```sh
+> chmod -R a+rwX "$HOME/.openhands" "$PROJECTS_PATH"
+> ```
+>
+> Docker Desktop (macOS/Windows) handles bind-mount permissions transparently, so
+> no `chmod` is needed there.
+
+> [!TIP]
+> The image's `openhands` user is **uid 10001**. Instead of `chmod`-ing the host
+> dirs, you can run the container as your own user so the bind mounts are
+> writable automatically (all persistent state lives under the mounted
+> `.openhands` dir, so this is safe in practice):
+>
+> ```sh
+> docker run -it --rm \
+>   --user "$(id -u):$(id -g)" \
+>   -e HOME=/home/openhands \
+>   -p 8000:8000 \
+>   -v "$HOME/.openhands:/home/openhands/.openhands" \
+>   -v "${PROJECTS_PATH}:/projects" \
+>   ghcr.io/openhands/agent-canvas:1.14.0 # x-release-please-version
+> ```
+>
+> The `-e HOME=/home/openhands` is required: the entrypoint derives all
+> persistence paths from `$HOME`, and an arbitrary uid (e.g. your host uid) has
+> no `/etc/passwd` entry inside the container, so `$HOME` would not resolve to
+> `/home/openhands` — without pinning it, state would silently detach from the
+> bind mount.
+
 **Windows (PowerShell / Windows Terminal):** See [README.windows.md](./README.windows.md) for the equivalent commands.
 
 The agent will be able to access any project under `PROJECTS_PATH`.
