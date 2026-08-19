@@ -337,6 +337,19 @@ describe("Sidebar", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    { collapsed: false, testId: "sidebar-join-slack-link" },
+    { collapsed: true, testId: "collapsed-join-slack-link" },
+  ])(
+    "does not render Join Slack at the top level when collapsed=$collapsed",
+    ({ collapsed, testId }) => {
+      useSidebarStore.setState({ collapsed });
+      renderSidebar("/conversations");
+
+      expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+    },
+  );
+
   it("shows collapsed server/settings action icons when sidebar is collapsed", () => {
     useSidebarStore.setState({ collapsed: true });
     renderSidebar("/conversations");
