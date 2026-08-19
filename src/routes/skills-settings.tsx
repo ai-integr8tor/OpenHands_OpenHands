@@ -35,6 +35,7 @@ import {
 import { retrieveAxiosErrorMessage } from "#/utils/retrieve-axios-error-message";
 import { settingsLikeMainScrollClassName } from "#/utils/settings-like-page-layout-classes";
 import { cn } from "#/utils/utils";
+import { useActiveBackend } from "#/contexts/active-backend-context";
 
 const SEARCH_URL_SYNC_DELAY_MS = 300;
 
@@ -44,6 +45,8 @@ function SkillsSettingsScreen() {
   const { mutate: saveSettings } = useSaveSettings();
   const { data: settings, isLoading: settingsLoading } = useSettings();
   const { data: skills, isLoading: skillsLoading } = useSkills();
+  const active = useActiveBackend();
+  const settingsIdentity = JSON.stringify([active.backend.id, active.orgId]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [queryInput, setQueryInput] = React.useState(
@@ -53,8 +56,8 @@ function SkillsSettingsScreen() {
   const lastWrittenQuery = React.useRef(queryInput);
 
   const [disabledSet, setDisabledSet] = React.useState<Set<string>>(new Set());
-  const [hasHydratedInitialSettings, setHasHydratedInitialSettings] =
-    React.useState(false);
+  const [hydratedSettingsIdentity, setHydratedSettingsIdentity] =
+    React.useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = React.useState<SkillInfo | null>(
     null,
   );
@@ -81,16 +84,22 @@ function SkillsSettingsScreen() {
 
   const activeFilterCount = countActiveFilters(filter);
 
-  // Sync local state with server settings when data first arrives
+  // Sync local state when settings first arrive or the active backend changes.
   React.useEffect(() => {
-    if (settingsLoading || !settings) return;
+    if (
+      settingsLoading ||
+      !settings ||
+      hydratedSettingsIdentity === settingsIdentity
+    ) {
+      return;
+    }
     setDisabledSet(new Set(settings.disabled_skills ?? []));
-    setHasHydratedInitialSettings(true);
-  }, [settingsLoading, settings?.disabled_skills]);
+    setHydratedSettingsIdentity(settingsIdentity);
+  }, [settingsLoading, settings, settingsIdentity, hydratedSettingsIdentity]);
 
   // Auto-save skill toggles once initial settings are loaded.
   React.useEffect(() => {
-    if (!hasHydratedInitialSettings) return;
+    if (hydratedSettingsIdentity !== settingsIdentity) return;
     saveSettings(
       { disabled_skills: Array.from(disabledSet) },
       {
@@ -100,7 +109,13 @@ function SkillsSettingsScreen() {
         },
       },
     );
-  }, [disabledSet, hasHydratedInitialSettings, saveSettings, t]);
+  }, [
+    disabledSet,
+    hydratedSettingsIdentity,
+    settingsIdentity,
+    saveSettings,
+    t,
+  ]);
 
   // Back and forward move `q` under a route that stays mounted, so the input has to take the URL's value back or it would keep showing — and debounce back — a query the user has already navigated away from.
   React.useEffect(() => {
