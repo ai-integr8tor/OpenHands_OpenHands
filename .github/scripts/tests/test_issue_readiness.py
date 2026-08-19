@@ -227,3 +227,58 @@ def test_extract_sections():
     assert "title two" in sections
     assert "Text 1" in sections["title one"]
     assert "Text 2" in sections["title two"]
+
+
+def test_extract_sections_trailing_colons_and_whitespace():
+    sections = extract_sections("### Actual Behavior:\nText 1\n### Acceptance Criteria : \n- [ ] item")
+    assert "actual behavior" in sections
+    assert "acceptance criteria" in sections
+    assert "Text 1" in sections["actual behavior"]
+    assert "- [ ] item" in sections["acceptance criteria"]
+
+
+def test_extract_sections_repeated_headings_accumulates_content():
+    body = (
+        "### Actual Behavior\nPart 1\n"
+        "### Expected Behavior\nExpected\n"
+        "### Actual Behavior\nPart 2\n"
+    )
+    sections = extract_sections(body)
+    assert "Part 1" in sections["actual behavior"]
+    assert "Part 2" in sections["actual behavior"]
+
+
+def test_bug_with_colons_in_headings_is_ready():
+    body_with_colons = """### Actual Behavior:
+I ran `npm run dev` and saw this:
+
+![screenshot](https://github.com/user-attachments/assets/abc123)
+
+The button was misaligned.
+
+### Expected Behavior:
+The button should be centered.
+
+### Acceptance Criteria:
+- [ ] Button is centered
+- [ ] No layout shift on resize
+"""
+    result = evaluate_readiness(body_with_colons, [BUG_LABEL])
+    assert result.ready, result.reasons
+
+
+def test_bug_repeated_actual_behavior_preserves_evidence():
+    body_repeated = """### Actual Behavior
+I used agent-canvas to reproduce this.
+
+![screenshot](https://example.com/screenshot.png)
+
+### Acceptance Criteria
+- [ ] Fixed
+
+### Actual Behavior
+Additional notes on the reproduction steps.
+"""
+    result = evaluate_readiness(body_repeated, [BUG_LABEL])
+    assert result.ready, result.reasons
+
