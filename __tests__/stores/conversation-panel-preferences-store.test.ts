@@ -19,6 +19,7 @@ describe("conversation-panel-preferences store", () => {
     expect(state.threadScope).toBe("all");
     expect(state.automationFilterMode).toBe("all");
     expect(state.selectedAutomationNames).toEqual([]);
+    expect(state.selectedTagFacets).toEqual([]);
   });
 
   it("toggles showOlderConversations and persists the new value to localStorage", () => {
@@ -78,14 +79,46 @@ describe("conversation-panel-preferences store", () => {
       "groupFolderOrder",
       "organizeMode",
       "selectedAutomationNames",
+      "selectedTagFacets",
       "showArchivedConversations",
       "showHoverMetadata",
       "showLlmProfiles",
       "showOlderConversations",
       "showRepoBranchMetadata",
       "showTagsMetadata",
+      "tagFiltersEnabled",
       "threadScope",
     ]);
+  });
+
+  it("toggles the Tag Filters gate and persists it to localStorage", () => {
+    useConversationPanelPreferencesStore.getState().toggleTagFiltersEnabled();
+
+    const persisted = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? "{}",
+    );
+    expect(persisted.state.tagFiltersEnabled).toBe(true);
+
+    useConversationPanelPreferencesStore
+      .getState()
+      .setTagFiltersEnabled(false);
+    expect(
+      useConversationPanelPreferencesStore.getState().tagFiltersEnabled,
+    ).toBe(false);
+  });
+
+  it("applies a layout preset's partial bundle in one action", () => {
+    useConversationPanelPreferencesStore.getState().applyLayoutSettings({
+      organizeMode: "grouped",
+      showOlderConversations: false,
+    });
+
+    const state = useConversationPanelPreferencesStore.getState();
+    expect(state.organizeMode).toBe("grouped");
+    expect(state.showOlderConversations).toBe(false);
+    // Fields the preset does not name stay untouched.
+    expect(state.conversationSort).toBe("updated");
+    expect(state.threadScope).toBe("all");
   });
 
   it("exposes setters and a toggler for the LLM-profiles preference", () => {
@@ -139,6 +172,55 @@ describe("conversation-panel-preferences store", () => {
     useConversationPanelPreferencesStore.setState({
       automationFilterMode: "all",
       selectedAutomationNames: [],
+    });
+  });
+
+  it("couples name selection and mode so the bar and popup cannot disagree", () => {
+    const store = useConversationPanelPreferencesStore.getState();
+
+    // Selecting a name via the bar toggle implies only-automations mode.
+    store.toggleAutomationNameAndMode("Nightly Audit");
+    let next = useConversationPanelPreferencesStore.getState();
+    expect(next.automationFilterMode).toBe("only-automations");
+    expect(next.selectedAutomationNames).toEqual(["Nightly Audit"]);
+
+    // Removing the last selected name returns the mode to all.
+    store.toggleAutomationNameAndMode("Nightly Audit");
+    next = useConversationPanelPreferencesStore.getState();
+    expect(next.automationFilterMode).toBe("all");
+    expect(next.selectedAutomationNames).toEqual([]);
+
+    // Leaving only-automations mode clears the selection (self-healing).
+    store.toggleAutomationNameAndMode("PR Review Bot");
+    store.setAutomationFilterMode("hide-automations");
+    next = useConversationPanelPreferencesStore.getState();
+    expect(next.selectedAutomationNames).toEqual([]);
+
+    // Restore defaults so later tests in this file see a pristine store.
+    useConversationPanelPreferencesStore.setState({
+      automationFilterMode: "all",
+      selectedAutomationNames: [],
+    });
+  });
+
+  it("toggles selected tag facets and persists them to localStorage", () => {
+    const store = useConversationPanelPreferencesStore.getState();
+    store.toggleTagFacet("origin=slack");
+    store.toggleTagFacet("owner=alice");
+    store.toggleTagFacet("origin=slack");
+
+    const next = useConversationPanelPreferencesStore.getState();
+    // Toggling twice removes the facet again; the other selection stays.
+    expect(next.selectedTagFacets).toEqual(["owner=alice"]);
+
+    const persisted = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? "{}",
+    );
+    expect(persisted.state.selectedTagFacets).toEqual(["owner=alice"]);
+
+    // Restore defaults so later tests in this file see a pristine store.
+    useConversationPanelPreferencesStore.setState({
+      selectedTagFacets: [],
     });
   });
 

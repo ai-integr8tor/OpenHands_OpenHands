@@ -198,8 +198,12 @@ describe("ConversationCard", () => {
     const model = screen.getByTestId("conversation-card-agent-chip");
     const tags = screen.getByTestId("conversation-card-tag-chips");
 
-    expect(repo.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(model.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      repo.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      model.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("renders the workspace folder name when no repository is selected", () => {
@@ -806,11 +810,12 @@ describe("ConversationCard", () => {
       expect(chips[0].getAttribute("title")).not.toContain("origin");
     });
 
-    it("keeps the automation name/trigger chips but hides the automation id chips", () => {
-      // The automation id/run-id tags are raw UUIDs consumed by the panel's
-      // automation filter — chip noise — while the human-meaningful name and
-      // trigger stay visible. Like every tag chip they render value-only,
-      // with the humanized ``key: value`` pair in the tooltip.
+    it("hides every automation provenance chip", () => {
+      // The whole automation family is reserved: the SDK stamps it at
+      // creation and the panel's automation filter is its first-class UI
+      // source. Rendering it as tag chips would double-book the user-facing
+      // tag surface — and let user-authored tags spoof automation
+      // classification.
       renderWithProviders(
         <ConversationCard
           title="Conversation 1"
@@ -826,15 +831,9 @@ describe("ConversationCard", () => {
         />,
       );
 
-      const chips = screen.getAllByTestId("conversation-card-tag-chip");
-      expect(chips).toHaveLength(2);
-      expect(chips[0]).toHaveTextContent("Nightly Audit");
-      expect(chips[0]).toHaveAttribute(
-        "title",
-        "Automationname: Nightly Audit",
-      );
-      expect(chips[1]).toHaveTextContent("cron");
-      expect(chips[1]).toHaveAttribute("title", "Automationtrigger: cron");
+      expect(
+        screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
     });
 
     it("hides the chips when showTags is omitted", () => {
@@ -849,6 +848,178 @@ describe("ConversationCard", () => {
 
       expect(
         screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders no tag UI at all when the Tags preference is off", () => {
+      // The preference owns presence: off means nothing about tags on the
+      // card, not even the indicator. This is what keeps the preference and
+      // the card from ever disagreeing — there is no card-level control left
+      // that could put tags back on screen while the toggle reads off.
+      renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          tags={{ origin: "slack", owner: "alice" }}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("conversation-tags-indicator"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the indicator outside the slot the hover overlay covers", () => {
+      // Regression: the indicator used to sit inside the trailing slot, which
+      // is the offset parent of the `absolute right-0` pin/ellipsis overlay.
+      // On hover that overlay covered 28 of the indicator's 29 pixels, so a
+      // real mouse click landed on the pin — the indicator's own
+      // stopPropagation never ran because the button never got the event.
+      // jsdom has no layout, so the geometry can't be asserted directly; what
+      // it can assert is the structural cause. Anything inside the trailing
+      // slot is reachable by the overlay; anything outside it is not.
+      renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          showTags
+          tags={{ origin: "slack", owner: "alice" }}
+          onTogglePin={vi.fn()}
+          onDelete={vi.fn()}
+          onContextMenuToggle={vi.fn()}
+        />,
+      );
+
+      const indicator = screen.getByTestId("conversation-tags-indicator");
+      const trailingSlot = screen.getByTestId(
+        "conversation-card-trailing-slot",
+      );
+      const hoverActions = screen.getByTestId(
+        "conversation-card-hover-actions",
+      );
+
+      expect(trailingSlot).toContainElement(hoverActions);
+      expect(trailingSlot).not.toContainElement(indicator);
+    });
+
+    it("starts expanded and lets the indicator tuck chips away, never remove them", async () => {
+      // The indicator owns density, not presence. Collapsed still advertises
+      // the tags as an icon + count, so no click on it can contradict a
+      // preference that reads on.
+      const user = userEvent.setup();
+      renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          showTags
+          tags={{ origin: "slack", owner: "alice" }}
+        />,
+      );
+
+      // Turning the preference on means "show me tags": chips are up front.
+      expect(screen.getAllByTestId("conversation-card-tag-chip")).toHaveLength(
+        2,
+      );
+      const indicator = screen.getByTestId("conversation-tags-indicator");
+      expect(indicator).toHaveTextContent("2");
+      expect(indicator).toHaveAttribute("aria-pressed", "true");
+      expect(indicator).toHaveAttribute(
+        "aria-label",
+        "CONVERSATION_PANEL$HIDE_TAGS",
+      );
+
+      await user.click(indicator);
+
+      // Collapsed: chips gone, but the indicator stays — tags are still
+      // present on the card, just compact.
+      expect(
+        screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
+      const collapsed = screen.getByTestId("conversation-tags-indicator");
+      expect(collapsed).toBeInTheDocument();
+      expect(collapsed).toHaveAttribute("aria-pressed", "false");
+      expect(collapsed).toHaveAttribute(
+        "aria-label",
+        "CONVERSATION_PANEL$SHOW_TAGS",
+      );
+
+      await user.click(collapsed);
+
+      expect(screen.getAllByTestId("conversation-card-tag-chip")).toHaveLength(
+        2,
+      );
+    });
+
+    it("re-expands a collapsed card when the Tags preference is toggled back on", async () => {
+      // Density is a glance-level choice, so asking for tags again gives you
+      // tags rather than whatever density the card was left at.
+      const user = userEvent.setup();
+      const { rerender } = renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          showTags
+          tags={{ origin: "slack", owner: "alice" }}
+        />,
+      );
+
+      await user.click(screen.getByTestId("conversation-tags-indicator"));
+      expect(
+        screen.queryByTestId("conversation-card-tag-chip"),
+      ).not.toBeInTheDocument();
+
+      // Preference off: nothing about tags at all.
+      rerender(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          tags={{ origin: "slack", owner: "alice" }}
+        />,
+      );
+      expect(
+        screen.queryByTestId("conversation-tags-indicator"),
+      ).not.toBeInTheDocument();
+
+      // Preference back on: expanded, not collapsed where it was left.
+      rerender(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          showTags
+          tags={{ origin: "slack", owner: "alice" }}
+        />,
+      );
+      expect(screen.getAllByTestId("conversation-card-tag-chip")).toHaveLength(
+        2,
+      );
+      expect(screen.getByTestId("conversation-tags-indicator")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    it("renders no indicator when every tag is reserved", () => {
+      renderWithProviders(
+        <ConversationCard
+          title="Conversation 1"
+          selectedRepository={null}
+          lastUpdatedAt="2021-10-01T12:00:00Z"
+          showTags
+          tags={{ acpserver: "claude-code" }}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("conversation-tags-indicator"),
       ).not.toBeInTheDocument();
     });
 
@@ -985,10 +1156,7 @@ describe("ConversationCard", () => {
 
       const chip = screen.getByTestId("conversation-card-agent-chip");
       expect(chip).toHaveTextContent("Claude Opus (1M)");
-      expect(chip).toHaveAttribute(
-        "title",
-        "Claude Code · Claude Opus (1M)",
-      );
+      expect(chip).toHaveAttribute("title", "Claude Code · Claude Opus (1M)");
     });
 
     it("falls back to the provider display name for an ACP conversation with no model", () => {

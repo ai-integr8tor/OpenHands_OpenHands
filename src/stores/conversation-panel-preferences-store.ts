@@ -32,8 +32,32 @@ interface ConversationPanelPreferencesState {
   threadScope: ThreadScope;
   automationFilterMode: AutomationFilterMode;
   selectedAutomationNames: string[];
+  selectedTagFacets: string[];
+  /**
+   * Whether the layouts menu exposes the Tag Filters section. Off by
+   * default: tag filtering is opt-in surface area, matching the Advanced
+   * options "Tag Filters" toggle that gates it.
+   */
+  tagFiltersEnabled: boolean;
   groupFolderOrder: string[];
 }
+
+/**
+ * The preference subset a conversation-layouts preset may set. Presets are
+ * partial bundles over these fields; any manual deviation in the Advanced
+ * options modal drops the active preset to "Custom".
+ */
+export type LayoutSettingsSlice = Pick<
+  ConversationPanelPreferencesState,
+  | "organizeMode"
+  | "conversationSort"
+  | "threadScope"
+  | "showOlderConversations"
+  | "showRepoBranchMetadata"
+  | "showLlmProfiles"
+  | "showTagsMetadata"
+  | "showHoverMetadata"
+>;
 
 interface ConversationPanelPreferencesActions {
   setShowOlderConversations: (value: boolean) => void;
@@ -53,6 +77,26 @@ interface ConversationPanelPreferencesActions {
   setThreadScope: (value: ThreadScope) => void;
   setAutomationFilterMode: (value: AutomationFilterMode) => void;
   toggleAutomationName: (name: string) => void;
+  /**
+   * Bar-facing toggle: selecting a name implies `only-automations` mode;
+   * removing the last selected name returns the mode to `all`. The popup's
+   * mode rows use `setAutomationFilterMode`, which clears the selection when
+   * the mode leaves `only-automations` — the two surfaces cannot disagree.
+   */
+  toggleAutomationNameAndMode: (name: string) => void;
+  /** Clears both filter selections and returns automation mode to `all`. */
+  clearFilterSelections: () => void;
+  toggleTagFacet: (facet: string) => void;
+  /**
+   * Clears the tag selection only. Distinct from `clearFilterSelections`,
+   * which also resets the automation filter — the active-tag-filter strip
+   * must not silently switch a surface it doesn't show.
+   */
+  clearTagFacets: () => void;
+  setTagFiltersEnabled: (value: boolean) => void;
+  toggleTagFiltersEnabled: () => void;
+  /** Applies a layout preset's partial bundle in one set(). */
+  applyLayoutSettings: (settings: Partial<LayoutSettingsSlice>) => void;
   setGroupFolderOrder: (order: readonly string[]) => void;
 }
 
@@ -71,6 +115,8 @@ const initialState: ConversationPanelPreferencesState = {
   threadScope: "all",
   automationFilterMode: "all",
   selectedAutomationNames: [],
+  selectedTagFacets: [],
+  tagFiltersEnabled: false,
   groupFolderOrder: [],
 };
 
@@ -126,7 +172,14 @@ export const useConversationPanelPreferencesStore =
           set(() => ({ conversationSort: value })),
         setThreadScope: (value) => set(() => ({ threadScope: value })),
         setAutomationFilterMode: (value) =>
-          set(() => ({ automationFilterMode: value })),
+          set((state) => ({
+            automationFilterMode: value,
+            // Name selections only make sense in only-automations mode;
+            // leaving the mode clears them (self-healing — a stale selection
+            // must never silently narrow an unfiltered-looking list).
+            selectedAutomationNames:
+              value === "only-automations" ? state.selectedAutomationNames : [],
+          })),
         toggleAutomationName: (name) =>
           set((state) => ({
             selectedAutomationNames: state.selectedAutomationNames.includes(
@@ -137,8 +190,41 @@ export const useConversationPanelPreferencesStore =
                 )
               : [...state.selectedAutomationNames, name],
           })),
+        toggleAutomationNameAndMode: (name) =>
+          set((state) => {
+            const selectedAutomationNames =
+              state.selectedAutomationNames.includes(name)
+                ? state.selectedAutomationNames.filter(
+                    (existing) => existing !== name,
+                  )
+                : [...state.selectedAutomationNames, name];
+            return {
+              selectedAutomationNames,
+              automationFilterMode:
+                selectedAutomationNames.length > 0 ? "only-automations" : "all",
+            };
+          }),
+        clearFilterSelections: () =>
+          set(() => ({
+            selectedTagFacets: [],
+            selectedAutomationNames: [],
+            automationFilterMode: "all",
+          })),
+        toggleTagFacet: (facet) =>
+          set((state) => ({
+            selectedTagFacets: state.selectedTagFacets.includes(facet)
+              ? state.selectedTagFacets.filter((existing) => existing !== facet)
+              : [...state.selectedTagFacets, facet],
+          })),
+        clearTagFacets: () => set(() => ({ selectedTagFacets: [] })),
         setGroupFolderOrder: (order) =>
           set(() => ({ groupFolderOrder: [...order] })),
+
+        setTagFiltersEnabled: (value) =>
+          set(() => ({ tagFiltersEnabled: value })),
+        toggleTagFiltersEnabled: () =>
+          set((state) => ({ tagFiltersEnabled: !state.tagFiltersEnabled })),
+        applyLayoutSettings: (settings) => set(() => ({ ...settings })),
       }),
       {
         name: "conversation-panel-preferences",
@@ -156,6 +242,8 @@ export const useConversationPanelPreferencesStore =
           threadScope: state.threadScope,
           automationFilterMode: state.automationFilterMode,
           selectedAutomationNames: state.selectedAutomationNames,
+          selectedTagFacets: state.selectedTagFacets,
+          tagFiltersEnabled: state.tagFiltersEnabled,
           groupFolderOrder: state.groupFolderOrder,
         }),
       },
